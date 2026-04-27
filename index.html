@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Soccer Value Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #0e1116;
+    color: #e6edf3;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #7d8590; font-size: 13px; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+  .card .label { color: #7d8590; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card .value { font-size: 28px; font-weight: 600; margin-top: 6px; }
+  .card .value.positive { color: #3fb950; }
+  .card .value.negative { color: #f85149; }
+  table { width: 100%; border-collapse: collapse; background: #161b22; border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #30363d; font-size: 13px; }
+  th { color: #7d8590; font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+  tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+  .badge.paper { background: #1f6feb33; color: #79c0ff; }
+  .badge.live { background: #d2992233; color: #f0c674; }
+  .edge { color: #3fb950; font-weight: 500; }
+  .empty { color: #7d8590; padding: 24px; text-align: center; }
+  .kill { background: #f8514922; border: 1px solid #f85149; border-radius: 8px; padding: 12px; margin-bottom: 16px; color: #f85149; }
+</style>
+</head>
+<body>
+  <h1>Soccer Value Dashboard</h1>
+  <div class="sub" id="generated">Loading...</div>
+
+  <div id="kill-warning"></div>
+
+  <div class="grid" id="stats"></div>
+
+  <h2 style="font-size: 16px; margin: 24px 0 12px;">Today's Picks</h2>
+  <div id="picks-table"></div>
+
+<script>
+async function load() {
+  try {
+    const picksResp = await fetch('../results/picks.json?_=' + Date.now());
+    const picks = await picksResp.json();
+
+    const clvResp = await fetch('../results/clv.json?_=' + Date.now()).catch(() => null);
+    const clvData = clvResp && clvResp.ok ? await clvResp.json() : [];
+
+    document.getElementById('generated').innerHTML =
+      `Generated ${picks.generated_at} &middot; ` +
+      `<span class="badge ${picks.mode.toLowerCase()}">${picks.mode}</span> &middot; ` +
+      `${picks.fixtures_processed} fixtures processed`;
+
+    // Compute CLV summary client-side from the log
+    const closedClv = clvData.filter(r => r.clv_pct !== null);
+    const avgClv = closedClv.length
+      ? (closedClv.reduce((s, r) => s + r.clv_pct, 0) / closedClv.length)
+      : null;
+    const clvClass = avgClv === null ? '' : (avgClv > 0 ? 'positive' : 'negative');
+    const clvDisplay = avgClv === null ? '—' : avgClv.toFixed(2) + '%';
+
+    document.getElementById('stats').innerHTML = `
+      <div class="card"><div class="label">Bets Flagged Today</div><div class="value">${picks.bets_flagged}</div></div>
+      <div class="card"><div class="label">Logged Bets (all-time)</div><div class="value">${clvData.length}</div></div>
+      <div class="card"><div class="label">Closed Bets (CLV computed)</div><div class="value">${closedClv.length}</div></div>
+      <div class="card"><div class="label">Average CLV</div><div class="value ${clvClass}">${clvDisplay}</div></div>
+    `;
+
+    if (closedClv.length >= 500 && avgClv < 0) {
+      document.getElementById('kill-warning').innerHTML = `
+        <div class="kill">
+          <strong>Kill switch triggered.</strong> ${closedClv.length} closed bets, average CLV ${avgClv.toFixed(2)}%.
+          The model has no edge. Stop betting.
+        </div>`;
+    }
+
+    const bets = picks.bets || [];
+    if (!bets.length) {
+      document.getElementById('picks-table').innerHTML = '<div class="empty">No value bets flagged today.</div>';
+      return;
+    }
+
+    const rows = bets.map(b => `
+      <tr>
+        <td>${b.fixture}</td>
+        <td>${b.selection}</td>
+        <td>${b.best_odds}</td>
+        <td>${b.best_book}</td>
+        <td>${(b.model_prob * 100).toFixed(1)}%</td>
+        <td>${(b.devigged_prob * 100).toFixed(1)}%</td>
+        <td class="edge">+${(b.edge * 100).toFixed(1)}%</td>
+        <td>$${b.stake.toFixed(0)}</td>
+      </tr>
+    `).join('');
+
+    document.getElementById('picks-table').innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Fixture</th><th>Selection</th><th>Odds</th><th>Book</th>
+            <th>Model</th><th>Market</th><th>Edge</th><th>Stake</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch (err) {
+    document.getElementById('generated').textContent = 'Failed to load: ' + err.message;
+  }
+}
+load();
+</script>
+</body>
+</html>

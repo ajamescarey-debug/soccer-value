@@ -45,20 +45,30 @@
   <div id="picks-table"></div>
 
 <script>
+// EDIT THIS — your GitHub username
+const USERNAME = "YOUR_GITHUB_USERNAME";
+// EDIT THIS — your repo name (probably "soccer-value")
+const REPO = "soccer-value";
+
+const RAW_BASE = `https://raw.githubusercontent.com/${USERNAME}/${REPO}/main`;
+
 async function load() {
   try {
-    const picksResp = await fetch('../results/picks.json?_=' + Date.now());
+    const picksResp = await fetch(`${RAW_BASE}/results/picks.json?_=${Date.now()}`);
+    if (!picksResp.ok) throw new Error(`picks.json fetch failed: ${picksResp.status}`);
     const picks = await picksResp.json();
 
-    const clvResp = await fetch('../results/clv.json?_=' + Date.now()).catch(() => null);
-    const clvData = clvResp && clvResp.ok ? await clvResp.json() : [];
+    let clvData = [];
+    try {
+      const clvResp = await fetch(`${RAW_BASE}/results/clv.json?_=${Date.now()}`);
+      if (clvResp.ok) clvData = await clvResp.json();
+    } catch (e) { /* clv.json may not exist yet, that's fine */ }
 
     document.getElementById('generated').innerHTML =
       `Generated ${picks.generated_at} &middot; ` +
       `<span class="badge ${picks.mode.toLowerCase()}">${picks.mode}</span> &middot; ` +
       `${picks.fixtures_processed} fixtures processed`;
 
-    // Compute CLV summary client-side from the log
     const closedClv = clvData.filter(r => r.clv_pct !== null);
     const avgClv = closedClv.length
       ? (closedClv.reduce((s, r) => s + r.clv_pct, 0) / closedClv.length)

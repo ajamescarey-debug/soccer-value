@@ -45,9 +45,7 @@
   <div id="picks-table"></div>
 
 <script>
-// EDIT THIS — your GitHub username
 const USERNAME = "ajamescarey-debug";
-// EDIT THIS — your repo name (probably "soccer-value")
 const REPO = "soccer-value";
 
 const RAW_BASE = `https://raw.githubusercontent.com/${USERNAME}/${REPO}/main`;
@@ -62,7 +60,7 @@ async function load() {
     try {
       const clvResp = await fetch(`${RAW_BASE}/results/clv.json?_=${Date.now()}`);
       if (clvResp.ok) clvData = await clvResp.json();
-    } catch (e) { /* clv.json may not exist yet, that's fine */ }
+    } catch (e) { /* clv.json may not exist yet */ }
 
     document.getElementById('generated').innerHTML =
       `Generated ${picks.generated_at} &middot; ` +
